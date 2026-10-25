@@ -13,14 +13,20 @@ der Backup-Instanz; danach kann der Stand dort in der gewohnten Admidio-Oberflä
 
 Ablauf:
 
-1. Ein Cron-Job führt [dump.php](dump.php) aus und legt pro Datenbank und Lauf eine Datei
-   `<DB_NAME>/<Zeitstempel>.sql.gz` im Backup-Verzeichnis (`../db_backup/`) ab.
-2. Das Plugin wind in der Produktiv-Instanz installeirt und die vorhandenen Backups zur Auswahl auf (Datenbank, Zeitstempel, Größe).
+1. Ein Cron-Job ruft [dump.php](dump.php) per HTTP-GET mit Token auf und legt pro Datenbank und
+   Lauf eine Datei `<DB_NAME>/<Zeitstempel>.sql.gz` im Backup-Verzeichnis (`../db_backup/`) ab.
+   Die Zugangsdaten stehen in `../dump-config.php`.
+2. Das Plugin wird in der Produktiv-Instanz installiert und listet die vorhandenen Backups der
+   produktiven Datenbank zur Auswahl auf (Zeitstempel, Größe).
 3. Nach Auswahl einer Datei und Bestätigung wird deren Inhalt in die Datenbank der Backup-Instanz
    importiert. Der bisherige Inhalt dieser Datenbank wird dabei ersetzt.
-3b. es soll eine manuelle sicherung erzeugt werden können vom aktuellen Zustand.
-4. Weiterhin gibt es einen optional schritt 'copy Admidio', der alle files der Admidio Instanz in den ordner der backup - instanz kopiert - config.php muss natürlich extra für die zweite instanz angepasst werden. Weiterhin soll eine Style anpassung erfolgen, der die Farbe ändert, damit ersichtlich ist, dass man nicht mehr auf produktion ist.
-5. In `url_backup` ist anschließend der Stand zum Zeitpunkt des Backups sichtbar.
+4. Zusätzlich kann manuell eine Sicherung des aktuellen Zustands der produktiven Datenbank
+   erzeugt werden.
+5. Optional: der Schritt „Admidio kopieren“ kopiert alle Dateien der Admidio-Instanz in den Ordner
+   der Backup-Instanz. Deren `config.php` wird dabei auf die Backup-Datenbank und `url_backup`
+   angepasst. Außerdem wird das Layout farblich geändert, damit sofort erkennbar ist, dass man
+   sich nicht auf der Produktion befindet.
+6. In `url_backup` ist anschließend der Stand zum Zeitpunkt des Backups sichtbar.
 
 ## Funktionen
 
@@ -58,27 +64,23 @@ Ablauf:
    | `$backup_adm_db` | Name der Backup-Datenbank (Ziel des Imports) |
    | `$backup_adm_usr`, `$backup_adm_pw` | Zugangsdaten der Backup-Datenbank |
    | `$backup_root_path` | URL der Backup-Instanz (`url_backup`) |
-   | `$backup_prod_root_path` | URL der produktiven Instanz (`url_prod`), nur zur Anzeige |
    | `$backup_dir` | Serverpfad zum Backup-Verzeichnis, außerhalb des Web-Roots |
-   | `$backup_source_db` | Name der produktiven Datenbank, deren Backups angeboten werden |
-   | `$backup_mysql` | optional: Pfad zum Programm `mysql` für den Import |
-   | `$backup_keep_days` | optional: ältere Backups nicht anbieten (`0` = alle) |
-   | `$backup_import_table_prefix` | optional: Tabellenpräfix der Admidio-Tabellen |
+   | `$backup_mysql`, `$backup_mysqldump` | optional: Pfade zu `mysql` (Import) und `mysqldump` (manuelle Sicherung) |
 
-   Die Backup-Datenbank muss sich von allen Datenbanken in `dump-config.php` unterscheiden.
+   Die produktive Datenbank (`$g_adm_*`) ist in der Admidio-`config.php` bereits vorhanden. Ihr
+   Name bestimmt, welche Backups angeboten werden. Die Backup-Datenbank muss sich davon unterscheiden.
 3. Cron-Job für `dump.php` auf dem Produktivserver einrichten.
 4. Plugin in der Backup-Instanz als Menüpunkt einbinden.
 
 ## Aufbau
 
 - [dump.php](dump.php) – Backup-Skript für den Cron-Job (erzeugt `.sql.gz` je Datenbank)
-- `index.php` – Einstiegspunkt, Autoloader, Rechteprüfung, Auswahlliste
-- `classes/` – Klassen unter dem Namespace `AdmBackup\` (Backup-Dateien ermitteln, Import)
-- `tests/` – PHPUnit-Tests, laufen ohne Admidio
+- `index.php` – Einstiegspunkt: Rechteprüfung (nur Administratoren), Autoloader, Liste, Aktionen
+- `classes/` – Klassen unter dem Namespace `AdmBackup\`: `BackupConfig`, `DatabaseAccess`,
+  `BackupFile`, `BackupRepository` (Dateien, letzter Import), `BackupImporter`, `BackupCreator`
+- `tests/` – PHPUnit-Tests, laufen ohne Admidio (`composer install`, dann `composer check`)
 - `config.php` – lokale Konfiguration (nicht im Repository)
 
 ## Entwicklung
 
 Programmierrichtlinien und Konventionen stehen in [CLAUDE.md](CLAUDE.md).
-Hinweis: Diese Datei stammt aus dem Projekt „Datenkonsistenz-Prüfungen“ und ist noch an dieses
-Plugin anzupassen (Namespace, Struktur, Prüfungen/`checks/` entfallen).

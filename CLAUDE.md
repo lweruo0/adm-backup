@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Admidio-5-Plugin „Datenkonsistenz-Prüfungen“ (`adm_plugins/data-checks`). Fachliche Beschreibung,
+Admidio-5-Plugin „Backup-Viewer“ (`adm_plugins/adm-backup`). Fachliche Beschreibung,
 Bedienung und Aufbau stehen in der @README.md und werden hier nicht wiederholt.
 
 Admidio-Quellen:
@@ -20,7 +20,7 @@ Die wichtigsten Regeln daraus, die in diesem Repo gelten:
   in einer Zeile.
 - **Benennung**: Klassen `PascalCase`, Funktionen und Variablen `camelCase`, Konstanten
   `GROSS_MIT_UNTERSTRICH`. Globale Admidio-Variablen tragen das Präfix `g` (`$gDb`, `$gCurrentUser`),
-  Request-Parameter das Präfix `get`/`post` (`$getCheck`). Keine kryptischen Abkürzungen.
+  Request-Parameter das Präfix `get`/`post` (`$getMode`). Keine kryptischen Abkürzungen.
 - **Parameter** mit Standardwerten stehen am Ende der Signatur.
 - **PHP-Tags**: nur `<?php`, nie `<?`. Reine PHP-Dateien ohne schließendes `?>`.
 - **Strings**: einfache Anführungszeichen. Doppelte nur für HTML-Attribute innerhalb von Strings.
@@ -29,11 +29,13 @@ Die wichtigsten Regeln daraus, die in diesem Repo gelten:
 - **Kommentare**: `//` für ein bis zwei Zeilen, `/* */` ab drei Zeilen. Klassen, Methoden und
   Dateien bekommen einen Doc-Block (Doxygen/PHPDoc-Stil) mit Zweck und Parametern.
 - **Dateien**: Kleinbuchstaben mit Unterstrichen (`neue_pruefung.php`), UTF-8 ohne BOM, LF-Zeilenenden.
-  Ausnahme: Klassendateien in `classes/` heißen wie die Klasse (`AbstractCheck.php`), damit der
-  Autoloader in `index.php` sie findet.
-- **Datenbank**: nur parametrisierte Abfragen über die Admidio-Datenbankklasse (`$gDb`, Platzhalter
-  `?` mit Parameter-Array). Nie Werte in SQL-Strings einbauen. Tabellennamen über die
-  Konstanten `TBL_*`.
+  Ausnahme: Klassendateien in `classes/` heißen wie die Klasse (`BackupRepository.php`), damit der
+  Autoloader in `index.php` sie findet. Auch `dump.php` und `dump-config.php` liegen im Repo-Stamm.
+- **Datenbank**: Das Plugin verbindet sich nicht selbst per SQL, sondern ruft `mysql` und
+  `mysqldump` über `proc_open` mit Argument-Array (nie über die Shell, nie Werte in
+  Kommandozeilen-Strings einbauen) auf. Passwörter gehen über `MYSQL_PWD`, nicht über Argumente.
+  Falls doch Abfragen über Admidio nötig werden: nur parametrisierte Abfragen über `$gDb`
+  (Platzhalter `?`) und Tabellennamen über `TBL_*`.
 - **Eingaben**: alle GET/POST-Parameter über `admFuncVariableIsValid()` prüfen. POST-Formulare mit
   CSRF-Token (`SecurityUtils::validateCsrfToken()`). Ausgaben mit `htmlspecialchars` escapen.
 - **Commits**: kurze Beschreibung der Änderung, zugehörige Issue-Nummer angeben (z. B. `#12`),
@@ -45,35 +47,28 @@ Die wichtigsten Regeln daraus, die in diesem Repo gelten:
   der Admidio-Richtlinie, die Englisch vorsieht). Bezeichner im Code bleiben Englisch.
 - **PHP 8.4+**: `declare`-freie, moderne Syntax ist erwünscht: `readonly`-Properties,
   Constructor Promotion, benannte Argumente, `static fn`, `str_starts_with` usw.
-- **Namespace**: alle Klassen liegen unter `AdmDataChecks\` in `classes/`, eine Klasse pro Datei.
-  Fertige Prüfklassen erben von `AbstractCheck` und rufen `parent::__construct($name, $description)`
-  auf. Infrastrukturklassen sind `final`.
-- **Prüfungen** in `checks/` sind reine Konfigurationsdateien: Doc-Block mit fachlicher
-  Beschreibung, `use`, dann `return new ...Check(...)` mit benannten Argumenten. Optionale
-  Parameter stehen als Kommentar mit Standardwert dabei, denn diese Dateien sind die einzige
-  Stelle, an der Beispiele dokumentiert werden (README und Klassen-Doc-Blöcke verweisen nur
-  darauf). Dateien mit führendem `_` werden ignoriert; gemeinsam genutzte Rollenlisten stehen in
-  `checks/_rollen.php`, nie kopiert in mehreren Prüfungen.
+- **Namespace**: alle Klassen liegen unter `AdmBackup\` in `classes/`, eine Klasse pro Datei.
+  Wertobjekte (`BackupConfig`, `DatabaseAccess`, `BackupFile`) sind `final readonly`, auch die
+  Dienstklassen sind `final`.
+- **Sicherheit der Backup-Instanz**: Das Plugin schreibt nie in die produktive Datenbank. Jeder
+  Import ruft zuerst `BackupConfig::assertTargetIsNotProduction()` auf. Dateinamen aus Requests
+  werden nie als Pfad verwendet, sondern nur über `BackupRepository::find()` gegen vorhandene Dateien
+  aufgelöst (festes Namensmuster `YYYY-MM-DD_HH-MM-SS.sql.gz`). Alle Aktionen sind auf
+  Administratoren beschränkt und per POST mit CSRF-Token geschützt.
+- **Dump-Skript**: `dump.php` wird per HTTP-GET mit Token aufgerufen und liest `../dump-config.php`.
+  Zugangsdaten, Token und Backup-Verzeichnis liegen außerhalb des Web-Roots und nie im Repo. Das
+  Skript bleibt eigenständig und nutzt keine Klassen des Plugins.
 - **Admidio-API**: Klassen aus dem Admidio-Kern per `use Admidio\...` einbinden, keine Kopien.
-  Globale Admidio-Variablen (`$gDb`, `$gCurrentOrgId`, ...) werden nur in `index.php` und
-  `AdmidioContext::fromGlobals()` gelesen; alle anderen Klassen bekommen den `AdmidioContext`
-  bzw. das `MemberRepository` übergeben. Zugriff auf Rollen, Profilfelder und Mitgliedschaften
-  über die Hilfsmethoden von `AbstractCheck`, nicht direkt per SQL in den Prüfungen. SQL gehört
-  in `MemberRepository`; Prüfungen erhalten Rollen als `RoleRef`, nie als Admidio-`Role`.
-- **Stichtag**: jede Prüfung arbeitet mit dem übergebenen `$referenceDate` (`Y-m-d`), nie mit dem
-  heutigen Datum.
-- **Ehemalige Mitglieder**: Der Schalter der Übersicht (`MemberScope`) wird nicht in den Prüfungen
-  ausgewertet, sondern zentral in `AbstractCheck::getRoleMembers()` / `getOrganizationMembers()`
-  (Einschränkung auf die Mitgliedsrolle am Stichtag). Eine Prüfung, für die das fachlich falsch ist,
-  überschreibt `restrictsToMembers()` und begründet das im Doc-Block. Tests stubben die Lademethoden
-  `loadRoleMembers()` / `loadOrganizationMembers()`, damit die Einschränkung mitgetestet wird.
-- **Tests**: PHPUnit in `tests/`, laufen ohne Admidio (`composer check` bzw. `php tools/lint.php`
-  und `php phpunit.phar`). Prüfklassen werden über eine anonyme Unterklasse mit dem Trait
-  `tests/Support/StubsDataAccess.php` getestet. Jede neue Prüfklasse bekommt einen Test, jede
-  Änderung an `checks/` muss `ChecksConfigurationTest` bestehen. Vor einem Commit Lint und Tests
-  ausführen.
-- **README pflegen**: neue Klassen, neue Dateien in `checks/` oder neue Hilfsmethoden in
-  `AbstractCheck` werden in der README (Tabellen in „Eigene Prüfung anlegen“ und Liste in
-  „Aufbau“) nachgetragen. Keine Code-Beispiele in die README kopieren.
-- **Nicht ins Repo**: `config.php`, `vendor/`, IDE-Ordner (siehe `.gitignore`).
+  Globale Admidio-Variablen (`$gCurrentUser`, `$GLOBALS` mit den Werten der `config.php`, ...)
+  werden nur in `index.php` gelesen; alle anderen Klassen bekommen `BackupConfig` bzw.
+  `BackupRepository` übergeben. Einstellungen kommen aus den Variablen der `config.php`
+  (`$backup_*`, `$g_adm_*`), siehe `config.example.php`; dort jede neue Einstellung nachtragen.
+- **Tests**: PHPUnit in `tests/`, laufen ohne Admidio (`composer install`, dann `composer check`).
+  Dateisystemtests arbeiten in einem temporären Verzeichnis und räumen auf. Jede neue Klasse mit
+  Logik bekommt einen Test; Klassen, die `mysql`/`mysqldump` starten, werden nicht automatisch
+  getestet. Vor einem Commit Tests ausführen.
+- **README pflegen**: neue Klassen, Dateien und Einstellungen werden in der README (Tabelle in
+  „Installation“ und Liste in „Aufbau“) nachgetragen. Keine Code-Beispiele in die README kopieren.
+- **Nicht ins Repo**: `config.php`, `dump-config.php`, `vendor/`, IDE-Ordner (siehe `.gitignore`).
+
 

@@ -19,10 +19,9 @@ $backup_dir = '/pfad/zu/db_backup';
 // Optional: Pfad zum Programm mysql für den Import
 $backup_mysql = 'mysql';
 
-// Production (Zugang zur produktiven Datenbank)
-// Access to the database of the SQL-Server
-$g_adm_srv  = 'host';     // Host
-$g_adm_port = 3306;     // Port
-$g_adm_db   = '';     // Database-Name
-$g_adm_usr  = ''; // Username
-$g_adm_pw   = ''; // Password
+// Optional: Pfad zum Programm mysqldump für die manuelle Sicherung
+$backup_mysqldump = 'mysqldump';
+
+// Zugang zur produktiven Datenbank: die Variablen $g_adm_srv, $g_adm_port, $g_adm_db, $g_adm_usr
+// und $g_adm_pw sind in der config.php der Admidio-Installation bereits vorhanden und werden
+// nur lesend verwendet (Auswahl der Backups, manuelle Sicherung, Schutzprüfung).

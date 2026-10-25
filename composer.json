@@ -1,0 +1,19 @@
+{
+    "name": "lweruo0/adm-backup",
+    "description": "Admidio-Plugin: Backups der produktiven Instanz in die Backup-Instanz einspielen",
+    "type": "project",
+    "require": {
+        "php": ">=8.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "AdmBackup\\": "classes/"
+        }
+    },
+    "scripts": {
+        "check": "phpunit"
+    }
+}
