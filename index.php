@@ -132,7 +132,7 @@ try {
     $html .= '<form method="post" class="mb-4">'
         . '<input type="hidden" name="adm_csrf_token" value="' . $escape($csrfToken) . '">'
         . '<input type="hidden" name="mode" value="create">'
-        . '<button type="submit" class="btn btn-primary">Jetzt Sicherung der produktiven Datenbank erstellen</button>'
+        . '<button type="submit" class="btn btn-primary btn-lg">Jetzt Sicherung der produktiven Datenbank erstellen</button>'
         . '</form>';
 
     // Wird bewusst nicht gespeichert: nach jedem Laden der Seite ist die Wiederherstellung wieder gesperrt
