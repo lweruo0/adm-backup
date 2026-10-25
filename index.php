@@ -165,7 +165,8 @@ try {
     }
 
     // DataTables entfernt Zeilen anderer Seiten aus dem DOM, daher steuert eine Klasse am Container die Sichtbarkeit
-    $html = '<style>#adm-backup:not(.adm-backup-production-on) .adm-backup-production { display: none; }</style>'
+    $html = '<style>#adm-backup .adm-backup-production { display: none !important; }'
+        . ' #adm-backup.adm-backup-production-on .adm-backup-production { display: inline !important; }</style>'
         . '<div id="adm-backup">' . $html . '</div>'
         . '<script>'
         . 'var admBackupToggle = document.getElementById("adm-backup-production-toggle");'
