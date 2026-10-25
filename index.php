@@ -119,9 +119,6 @@ try {
         $html .= '<div class="alert alert-danger">' . $escape($error) . '</div>';
     }
 
-    $html .= '<p>Produktive Datenbank: <strong>' . $escape($config->production->db) . '</strong>, '
-        . 'Ziel des Imports: <strong>' . $escape($config->target->db) . '</strong></p>';
-
     if ($config->backupRootPath !== '') {
         $html .= '<p><a href="' . $escape($config->backupRootPath) . '" class="btn btn-lg" style="' . $backupButtonStyle . '" '
             . 'target="_blank" rel="noopener">Backup-Instanz öffnen</a></p>';
