@@ -84,6 +84,27 @@ try {
     $backupFiles = $repository->findAll();
     $escape = static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
+    // Farbe der produktiven Instanz (Admidio 5.1: theme_color_primary, 5.0: color_primary)
+    $productionColor = '#349aaa';
+    foreach (['theme_color_primary', 'color_primary'] as $colorSetting) {
+        if ($gSettingsManager->has($colorSetting)
+            && preg_match('/^#[0-9a-fA-F]{6}$/', $gSettingsManager->getString($colorSetting)) === 1) {
+            $productionColor = $gSettingsManager->getString($colorSetting);
+            break;
+        }
+    }
+
+    // Inline-Stil für einen Button in der angegebenen Farbe, Schrift schwarz oder weiß je nach Helligkeit
+    $buttonStyle = static function (string $color): string {
+        $brightness = (hexdec(substr($color, 1, 2)) * 299 + hexdec(substr($color, 3, 2)) * 587
+            + hexdec(substr($color, 5, 2)) * 114) / 1000;
+        $textColor = $brightness > 150 ? '#000000' : '#ffffff';
+
+        return 'background-color: ' . $color . '; border-color: ' . $color . '; color: ' . $textColor . ';';
+    };
+    $backupButtonStyle = $buttonStyle($config->colorPrimary);
+    $productionButtonStyle = $buttonStyle($productionColor);
+
     $page = PagePresenter::withHtmlIDAndHeadline('plg-adm-backup', 'Backups einspielen');
 
     $html = '<p>Hier können Datenbank Backups zusätzlich zu den automatisch erstellten Backups erstellt werden. '
@@ -102,7 +123,7 @@ try {
         . 'Ziel des Imports: <strong>' . $escape($config->target->db) . '</strong></p>';
 
     if ($config->backupRootPath !== '') {
-        $html .= '<p><a href="' . $escape($config->backupRootPath) . '" class="btn btn-primary btn-lg" '
+        $html .= '<p><a href="' . $escape($config->backupRootPath) . '" class="btn btn-lg" style="' . $backupButtonStyle . '" '
             . 'target="_blank" rel="noopener">Backup-Instanz öffnen</a></p>';
     }
 
@@ -142,7 +163,7 @@ try {
                 . '<input type="hidden" name="adm_csrf_token" value="' . $escape($csrfToken) . '">'
                 . '<input type="hidden" name="mode" value="import">'
                 . '<input type="hidden" name="file" value="' . $escape($backupFile->fileName) . '">'
-                . '<button type="submit" class="btn btn-secondary btn-sm">Einspielen</button>'
+                . '<button type="submit" class="btn btn-sm" style="' . $backupButtonStyle . '">Einspielen</button>'
                 . '</form> '
                 . '<form method="post" class="d-inline adm-backup-production" '
                 . 'onsubmit="if (!confirm(this.dataset.confirm)) { return false; } this.confirmProduction.value = \'1\';" '
@@ -151,7 +172,7 @@ try {
                 . '<input type="hidden" name="mode" value="importProduction">'
                 . '<input type="hidden" name="file" value="' . $escape($backupFile->fileName) . '">'
                 . '<input type="hidden" name="confirmProduction" value="0">'
-                . '<button type="submit" class="btn btn-danger btn-sm">Einspielen produktiv</button>'
+                . '<button type="submit" class="btn btn-sm" style="' . $productionButtonStyle . '">Einspielen produktiv</button>'
                 . '</form></td></tr>';
         }
         $html .= '</tbody></table>';
