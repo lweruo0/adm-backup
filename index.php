@@ -10,6 +10,7 @@
 
 use Admidio\Infrastructure\Exception;
 use Admidio\Infrastructure\Utils\SecurityUtils;
+use Admidio\UI\Component\DataTables;
 use Admidio\UI\Presenter\PagePresenter;
 use AdmBackup\BackupConfig;
 use AdmBackup\BackupCreator;
@@ -129,19 +130,21 @@ try {
     if ($backupFiles === []) {
         $html .= '<p>Keine Backups gefunden.</p>';
     } else {
-        $html .= '<table class="table table-condensed"><thead><tr><th>Erstellt</th><th>Datei</th>'
-            . '<th>Größe</th><th></th></tr></thead><tbody>';
+        $html .= '<table id="adm_backup_table" class="table table-hover" width="100%" style="width: 100%;">'
+            . '<thead><tr><th>Erstellt</th><th>Datei</th><th>Größe</th><th></th></tr></thead><tbody>';
         foreach ($backupFiles as $backupFile) {
-            $html .= '<tr><td>' . $escape($backupFile->createdAt->format('d.m.Y H:i:s')) . '</td>'
+            $html .= '<tr><td data-order="' . $backupFile->createdAt->getTimestamp() . '">'
+                . $escape($backupFile->createdAt->format('d.m.Y H:i:s')) . '</td>'
                 . '<td>' . $escape($backupFile->fileName) . '</td>'
-                . '<td>' . $escape(number_format($backupFile->size / 1048576, 2, ',', '.')) . ' MB</td>'
+                . '<td data-order="' . $backupFile->size . '">'
+                . $escape(number_format($backupFile->size / 1048576, 2, ',', '.')) . ' MB</td>'
                 . '<td class="text-nowrap"><form method="post" class="d-inline" onsubmit="return confirm(\'Die Backup-Datenbank wird komplett ersetzt. Fortfahren?\');">'
                 . '<input type="hidden" name="adm_csrf_token" value="' . $escape($csrfToken) . '">'
                 . '<input type="hidden" name="mode" value="import">'
                 . '<input type="hidden" name="file" value="' . $escape($backupFile->fileName) . '">'
                 . '<button type="submit" class="btn btn-secondary btn-sm">Einspielen</button>'
                 . '</form> '
-                . '<form method="post" class="d-inline adm-backup-production d-none" '
+                . '<form method="post" class="d-inline adm-backup-production" '
                 . 'onsubmit="if (!confirm(this.dataset.confirm)) { return false; } this.confirmProduction.value = \'1\';" '
                 . 'data-confirm="' . $escape($productionConfirm) . '">'
                 . '<input type="hidden" name="adm_csrf_token" value="' . $escape($csrfToken) . '">'
@@ -152,15 +155,24 @@ try {
                 . '</form></td></tr>';
         }
         $html .= '</tbody></table>';
+
+        $dataTables = new DataTables($page, 'adm_backup_table');
+        $dataTables->setRowsPerPage(10);
+        $dataTables->setOrderColumns([[1, 'desc']]);
+        $dataTables->disableColumnsSort([4]);
+        $dataTables->setColumnsNotHideResponsive([4]);
+        $dataTables->createJavascript(count($backupFiles), 4);
     }
 
-    $html .= '<script>'
-        . 'document.getElementById("adm-backup-production-toggle").addEventListener("change", function () {'
-        . 'document.querySelectorAll(".adm-backup-production").forEach(function (form) {'
-        . 'form.classList.toggle("d-none", !this.checked);'
-        . '}, this);'
+    // DataTables entfernt Zeilen anderer Seiten aus dem DOM, daher steuert eine Klasse am Container die Sichtbarkeit
+    $html = '<style>#adm-backup:not(.adm-backup-production-on) .adm-backup-production { display: none; }</style>'
+        . '<div id="adm-backup">' . $html . '</div>'
+        . '<script>'
+        . 'var admBackupToggle = document.getElementById("adm-backup-production-toggle");'
+        . 'admBackupToggle.checked = false;'
+        . 'admBackupToggle.addEventListener("change", function () {'
+        . 'document.getElementById("adm-backup").classList.toggle("adm-backup-production-on", this.checked);'
         . '});'
-        . 'document.getElementById("adm-backup-production-toggle").checked = false;'
         . '</script>';
 
     $page->addHtml($html);
