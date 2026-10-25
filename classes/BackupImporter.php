@@ -26,7 +26,29 @@ final class BackupImporter
     {
         $this->config->assertTargetIsNotProduction();
 
-        $this->runMysql(static function ($input) use ($file): void {
+        $this->runMysql($this->config->target, $this->backupFeeder($file), 'Import fehlgeschlagen');
+
+        $this->applyThemeColors();
+        $this->repository->writeLastImport($file, new DateTimeImmutable());
+    }
+
+    /**
+     * Spielt ein Backup in die PRODUKTIVE Datenbank ein und ersetzt deren Inhalt. Die Designfarben
+     * der Backup-Instanz werden hier bewusst nicht gesetzt, der letzte Import wird nicht vermerkt.
+     *
+     * @throws RuntimeException Bei Fehlern
+     */
+    public function importToProduction(BackupFile $file): void
+    {
+        $this->runMysql($this->config->production, $this->backupFeeder($file), 'Import in die Produktion fehlgeschlagen');
+    }
+
+    /**
+     * @return callable(resource): void Schreibt den entpackten Inhalt der Backup-Datei in den Eingabestrom
+     */
+    private function backupFeeder(BackupFile $file): callable
+    {
+        return static function ($input) use ($file): void {
             $source = gzopen($file->path, 'rb');
             if ($source === false) {
                 throw new RuntimeException('Die Backup-Datei kann nicht gelesen werden.');
@@ -39,10 +61,7 @@ final class BackupImporter
                 }
             }
             gzclose($source);
-        }, 'Import fehlgeschlagen');
-
-        $this->applyThemeColors();
-        $this->repository->writeLastImport($file, new DateTimeImmutable());
+        };
     }
 
     /**
@@ -57,7 +76,7 @@ final class BackupImporter
         $this->config->assertTargetIsNotProduction();
 
         $sql = $this->buildThemeColorSql();
-        $this->runMysql(static function ($input) use ($sql): void {
+        $this->runMysql($this->config->target, static function ($input) use ($sql): void {
             fwrite($input, $sql);
         }, 'Designfarben konnten nicht gesetzt werden');
     }
@@ -82,15 +101,16 @@ final class BackupImporter
     }
 
     /**
-     * Startet mysql für die Backup-Datenbank und füttert es über $feed mit SQL.
+     * Startet mysql für die angegebene Datenbank und füttert es über $feed mit SQL.
      *
+     * @param DatabaseAccess $database Zieldatenbank
      * @param callable(resource): void $feed Schreibt SQL in den übergebenen Eingabestrom
      * @param string $errorPrefix Beginn der Fehlermeldung
      * @throws RuntimeException Bei Fehlern
      */
-    private function runMysql(callable $feed, string $errorPrefix): void
+    private function runMysql(DatabaseAccess $database, callable $feed, string $errorPrefix): void
     {
-        $target = $this->config->target;
+        $target = $database;
         $command = [$this->config->mysqlBinary, ...$target->clientArguments(), $target->db];
 
         $errorFile = (string) tempnam(sys_get_temp_dir(), 'adm_backup_err_');

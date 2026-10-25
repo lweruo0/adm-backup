@@ -41,7 +41,7 @@ try {
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         SecurityUtils::validateCsrfToken($_POST['adm_csrf_token'] ?? '');
-        $postMode = admFuncVariableIsValid($_POST, 'mode', 'string', ['validValues' => ['import', 'create']]);
+        $postMode = admFuncVariableIsValid($_POST, 'mode', 'string', ['validValues' => ['import', 'importProduction', 'create']]);
 
         set_time_limit(0);
         ignore_user_abort(true);
@@ -56,8 +56,22 @@ try {
                 if ($file === null) {
                     throw new RuntimeException('Die gewählte Backup-Datei existiert nicht.');
                 }
-                (new BackupImporter($config, $repository))->import($file);
-                $messages[] = 'Backup ' . $file->fileName . ' wurde in die Backup-Datenbank eingespielt.';
+
+                if ($postMode === 'importProduction') {
+                    // Wird von der Abfrage im Browser gesetzt, nicht von einer bloßen Formularübermittlung
+                    if (($_POST['confirmProduction'] ?? '') !== '1') {
+                        throw new RuntimeException('Die Wiederherstellung der Produktion wurde nicht bestätigt.');
+                    }
+
+                    // Vorher den aktuellen Stand sichern, damit die Wiederherstellung umkehrbar bleibt
+                    $safetyBackup = (new BackupCreator($config, $repository))->create(new DateTimeImmutable());
+                    (new BackupImporter($config, $repository))->importToProduction($file);
+                    $messages[] = 'Backup ' . $file->fileName . ' wurde in die PRODUKTIVE Datenbank eingespielt. '
+                        . 'Vorheriger Stand gesichert als ' . $safetyBackup->fileName . '.';
+                } else {
+                    (new BackupImporter($config, $repository))->import($file);
+                    $messages[] = 'Backup ' . $file->fileName . ' wurde in die Backup-Datenbank eingespielt.';
+                }
             }
         } catch (RuntimeException $exception) {
             $errors[] = $exception->getMessage();
@@ -71,7 +85,11 @@ try {
 
     $page = PagePresenter::withHtmlIDAndHeadline('plg-adm-backup', 'Backups einspielen');
 
-    $html = '';
+    $html = '<p>Hier können Datenbank Backups zusätzlich zu den automatisch erstellten Backups erstellt werden. '
+        . 'Über den Link „Einspielen“ kann die Datenbank auf eine zweite Instanz eingespielt und angesehen werden. '
+        . 'Über den Link „Einspielen produktiv“ wird die Sicherung auf der produktiven Instanz eingespielt - '
+        . 'dabei gehen alle lokalen Änderungen verloren. Ein manuelles Backup wird daher empfohlen.</p>';
+
     foreach ($messages as $message) {
         $html .= '<div class="alert alert-success">' . $escape($message) . '</div>';
     }
@@ -84,7 +102,7 @@ try {
 
     if ($config->backupRootPath !== '') {
         $html .= '<p><a href="' . $escape($config->backupRootPath) . '" class="btn btn-primary btn-lg" '
-            . 'target="_blank" rel="noopener">Zur Backup-Instanz öffnen</a></p>';
+            . 'target="_blank" rel="noopener">Backup-Instanz öffnen</a></p>';
     }
 
     if ($lastImport !== null) {
@@ -98,6 +116,16 @@ try {
         . '<button type="submit" class="btn btn-primary">Jetzt Sicherung der produktiven Datenbank erstellen</button>'
         . '</form>';
 
+    // Wird bewusst nicht gespeichert: nach jedem Laden der Seite ist die Wiederherstellung wieder gesperrt
+    $html .= '<div class="form-check mb-3">'
+        . '<input type="checkbox" class="form-check-input" id="adm-backup-production-toggle" autocomplete="off">'
+        . '<label class="form-check-label" for="adm-backup-production-toggle">'
+        . 'Wiederherstellung der produktiven Datenbank aktivieren</label></div>';
+
+    $productionConfirm = 'ACHTUNG: Die PRODUKTIVE Datenbank ' . $config->production->db
+        . ' wird komplett durch dieses Backup ersetzt. Alle neueren Daten gehen verloren '
+        . '(vorher wird eine Sicherung des aktuellen Stands erstellt). Wirklich fortfahren?';
+
     if ($backupFiles === []) {
         $html .= '<p>Keine Backups gefunden.</p>';
     } else {
@@ -107,15 +135,33 @@ try {
             $html .= '<tr><td>' . $escape($backupFile->createdAt->format('d.m.Y H:i:s')) . '</td>'
                 . '<td>' . $escape($backupFile->fileName) . '</td>'
                 . '<td>' . $escape(number_format($backupFile->size / 1048576, 2, ',', '.')) . ' MB</td>'
-                . '<td><form method="post" onsubmit="return confirm(\'Die Backup-Datenbank wird komplett ersetzt. Fortfahren?\');">'
+                . '<td class="text-nowrap"><form method="post" class="d-inline" onsubmit="return confirm(\'Die Backup-Datenbank wird komplett ersetzt. Fortfahren?\');">'
                 . '<input type="hidden" name="adm_csrf_token" value="' . $escape($csrfToken) . '">'
                 . '<input type="hidden" name="mode" value="import">'
                 . '<input type="hidden" name="file" value="' . $escape($backupFile->fileName) . '">'
                 . '<button type="submit" class="btn btn-secondary btn-sm">Einspielen</button>'
+                . '</form> '
+                . '<form method="post" class="d-inline adm-backup-production d-none" '
+                . 'onsubmit="if (!confirm(this.dataset.confirm)) { return false; } this.confirmProduction.value = \'1\';" '
+                . 'data-confirm="' . $escape($productionConfirm) . '">'
+                . '<input type="hidden" name="adm_csrf_token" value="' . $escape($csrfToken) . '">'
+                . '<input type="hidden" name="mode" value="importProduction">'
+                . '<input type="hidden" name="file" value="' . $escape($backupFile->fileName) . '">'
+                . '<input type="hidden" name="confirmProduction" value="0">'
+                . '<button type="submit" class="btn btn-danger btn-sm">Einspielen produktiv</button>'
                 . '</form></td></tr>';
         }
         $html .= '</tbody></table>';
     }
+
+    $html .= '<script>'
+        . 'document.getElementById("adm-backup-production-toggle").addEventListener("change", function () {'
+        . 'document.querySelectorAll(".adm-backup-production").forEach(function (form) {'
+        . 'form.classList.toggle("d-none", !this.checked);'
+        . '}, this);'
+        . '});'
+        . 'document.getElementById("adm-backup-production-toggle").checked = false;'
+        . '</script>';
 
     $page->addHtml($html);
     $page->show();

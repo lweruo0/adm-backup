@@ -50,8 +50,11 @@ Die wichtigsten Regeln daraus, die in diesem Repo gelten:
 - **Namespace**: alle Klassen liegen unter `AdmBackup\` in `classes/`, eine Klasse pro Datei.
   Wertobjekte (`BackupConfig`, `DatabaseAccess`, `BackupFile`) sind `final readonly`, auch die
   Dienstklassen sind `final`.
-- **Sicherheit der Backup-Instanz**: Das Plugin schreibt nie in die produktive Datenbank. Jeder
-  Import ruft zuerst `BackupConfig::assertTargetIsNotProduction()` auf. Dateinamen aus Requests
+- **Sicherheit der Backup-Instanz**: Der normale Import schreibt nie in die produktive Datenbank
+  und ruft zuerst `BackupConfig::assertTargetIsNotProduction()` auf. Nur `importToProduction()`
+  (Wiederherstellung) schreibt in die Produktion: sie ist hinter einer ungespeicherten Checkbox
+  und einer Bestätigung versteckt, der Server verlangt `confirmProduction=1`, und `index.php`
+  sichert vorher den aktuellen Stand. Designfarben werden dort nie gesetzt. Dateinamen aus Requests
   werden nie als Pfad verwendet, sondern nur über `BackupRepository::find()` gegen vorhandene Dateien
   aufgelöst (festes Namensmuster `YYYY-MM-DD_HH-MM-SS.sql.gz`). Alle Aktionen sind auf
   Administratoren beschränkt und per POST mit CSRF-Token geschützt.

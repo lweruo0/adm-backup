@@ -33,6 +33,8 @@ Ablauf:
 - Auswahlliste der verfügbaren Backup-Dateien (neueste zuerst), gefiltert auf die Datenbank der
   produktiven Admidio-Instanz.
 - Anzeige von Zeitstempel (aus dem Dateinamen) und Dateigröße.
+- Optional freischaltbar (Checkbox, nicht gespeichert): „Einspielen produktiv“ stellt ein Backup in
+  der produktiven Datenbank wieder her, nach einer Bestätigung und mit automatischer Vorab-Sicherung.
 - Einspielen des gewählten Backups (`.sql.gz`) in die Backup-Datenbank. Danach werden Primär-
   (`#ff0000`) und Sekundärfarbe (`#808080`) des Designs in der Backup-Datenbank gesetzt, damit die
   Backup-Instanz sofort erkennbar ist.
@@ -41,8 +43,13 @@ Ablauf:
 
 ## Sicherheit
 
-- Das Plugin darf **nie** in die produktive Datenbank schreiben. Ziel ist ausschließlich die
-  Datenbank der Backup-Instanz (`$gDb` der Backup-Installation).
+- Der normale Import schreibt ausschließlich in die Backup-Datenbank (`$backup_adm_*`) und bricht
+  ab, wenn diese mit der produktiven übereinstimmt. In die produktive Datenbank wird nur über die
+  bewusst freizuschaltende Wiederherstellung geschrieben: Die Checkbox „Wiederherstellung der
+  produktiven Datenbank aktivieren“ wird nicht gespeichert (nach jedem Laden der Seite wieder
+  aus), der Button „Einspielen produktiv“ erscheint nur bei gesetzter Checkbox und verlangt eine
+  Bestätigung. Vor der Wiederherstellung wird automatisch eine Sicherung des aktuellen Stands
+  erstellt.
 - Importiert wird nur aus dem konfigurierten Backup-Verzeichnis; der Dateiname kommt aus einer
   Auswahlliste und wird gegen die tatsächlich vorhandenen Dateien geprüft (kein freier Pfad).
 - Das Einspielen ist ein POST-Formular mit CSRF-Token und Bestätigungsdialog.
