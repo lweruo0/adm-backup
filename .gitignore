@@ -1,0 +1,5 @@
+dump-config.php
+config.php
+vendor/
+.idea/
+.vscode/
