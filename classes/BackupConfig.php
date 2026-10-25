@@ -19,6 +19,9 @@ final readonly class BackupConfig
      * @param DatabaseAccess $target Backup-Datenbank (Ziel des Imports)
      * @param DatabaseAccess $production Produktive Datenbank (nur Lesezugriff)
      * @param string $backupRootPath URL der Backup-Instanz
+     * @param string $tablePrefix Tabellenpräfix der Admidio-Tabellen (aus $g_tbl_praefix)
+     * @param string $colorPrimary Primärfarbe der Backup-Instanz (#rrggbb)
+     * @param string $colorSecondary Sekundärfarbe der Backup-Instanz (#rrggbb)
      */
     public function __construct(
         public string $backupDir,
@@ -26,8 +29,19 @@ final readonly class BackupConfig
         public string $mysqldumpBinary,
         public DatabaseAccess $target,
         public DatabaseAccess $production,
-        public string $backupRootPath = ''
+        public string $backupRootPath = '',
+        public string $tablePrefix = 'adm',
+        public string $colorPrimary = '#ff0000',
+        public string $colorSecondary = '#808080'
     ) {
+        if (preg_match('/^[A-Za-z0-9_]+$/', $tablePrefix) !== 1) {
+            throw new RuntimeException('Ungültiger Tabellenpräfix.');
+        }
+        foreach ([$colorPrimary, $colorSecondary] as $color) {
+            if (preg_match('/^#[0-9a-fA-F]{6}$/', $color) !== 1) {
+                throw new RuntimeException('Ungültige Farbe: ' . $color);
+            }
+        }
     }
 
     /**
@@ -63,7 +77,10 @@ final readonly class BackupConfig
                 (string) $globals['g_adm_usr'],
                 (string) $globals['g_adm_pw']
             ),
-            backupRootPath: (string) ($globals['backup_root_path'] ?? '')
+            backupRootPath: (string) ($globals['backup_root_path'] ?? ''),
+            tablePrefix: (string) ($globals['g_tbl_praefix'] ?? 'adm'),
+            colorPrimary: (string) ($globals['backup_color_primary'] ?? '#ff0000'),
+            colorSecondary: (string) ($globals['backup_color_secondary'] ?? '#808080')
         );
     }
 

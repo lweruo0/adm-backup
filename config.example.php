@@ -22,6 +22,10 @@ $backup_mysql = 'mysql';
 // Optional: Pfad zum Programm mysqldump für die manuelle Sicherung
 $backup_mysqldump = 'mysqldump';
 
+// Optional: Designfarben der Backup-Instanz, werden nach jedem Import gesetzt (#rrggbb)
+$backup_color_primary   = '#ff0000'; // Primärfarbe
+$backup_color_secondary = '#808080'; // Sekundärfarbe
+
 // Zugang zur produktiven Datenbank: die Variablen $g_adm_srv, $g_adm_port, $g_adm_db, $g_adm_usr
 // und $g_adm_pw sind in der config.php der Admidio-Installation bereits vorhanden und werden
 // nur lesend verwendet (Auswahl der Backups, manuelle Sicherung, Schutzprüfung).

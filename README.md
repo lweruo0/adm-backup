@@ -33,7 +33,9 @@ Ablauf:
 - Auswahlliste der verfügbaren Backup-Dateien (neueste zuerst), gefiltert auf die Datenbank der
   produktiven Admidio-Instanz.
 - Anzeige von Zeitstempel (aus dem Dateinamen) und Dateigröße.
-- Einspielen des gewählten Backups (`.sql.gz`) in die Backup-Datenbank.
+- Einspielen des gewählten Backups (`.sql.gz`) in die Backup-Datenbank. Danach werden Primär-
+  (`#ff0000`) und Sekundärfarbe (`#808080`) des Designs in der Backup-Datenbank gesetzt, damit die
+  Backup-Instanz sofort erkennbar ist.
 - Anzeige, welches Backup zuletzt eingespielt wurde.
 - Zugriff nur für Administratoren der Backup-Instanz.
 
@@ -66,11 +68,20 @@ Ablauf:
    | `$backup_root_path` | URL der Backup-Instanz (`url_backup`) |
    | `$backup_dir` | Serverpfad zum Backup-Verzeichnis, außerhalb des Web-Roots |
    | `$backup_mysql`, `$backup_mysqldump` | optional: Pfade zu `mysql` (Import) und `mysqldump` (manuelle Sicherung) |
+   | `$backup_color_primary`, `$backup_color_secondary` | optional: Designfarben der Backup-Instanz (`#rrggbb`), Standard `#ff0000` und `#808080` |
 
    Die produktive Datenbank (`$g_adm_*`) ist in der Admidio-`config.php` bereits vorhanden. Ihr
    Name bestimmt, welche Backups angeboten werden. Die Backup-Datenbank muss sich davon unterscheiden.
 3. Cron-Job für `dump.php` auf dem Produktivserver einrichten.
-4. Plugin in der Backup-Instanz als Menüpunkt einbinden.
+4. Plugin in der Produktiv-Instanz als Menüpunkt einbinden (Administration → Menü):
+
+   | Feld | Vorschlag |
+   |---|---|
+   | Name | Backups |
+   | URL | `/adm_plugins/adm-backup/index.php` |
+   | Icon | `database-down` (Bootstrap Icons, passt zum Einspielen eines Datenbank-Backups) |
+
+   Alternativen: `database-fill-down`, `cloud-download`, `arrow-counterclockwise`, `safe`.
 
 ## Aufbau
 
