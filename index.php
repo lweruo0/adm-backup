@@ -80,11 +80,12 @@ try {
     }
 
     $html .= '<p>Produktive Datenbank: <strong>' . $escape($config->production->db) . '</strong>, '
-        . 'Ziel des Imports: <strong>' . $escape($config->target->db) . '</strong>';
+        . 'Ziel des Imports: <strong>' . $escape($config->target->db) . '</strong></p>';
+
     if ($config->backupRootPath !== '') {
-        $html .= ' (<a href="' . $escape($config->backupRootPath) . '">' . $escape($config->backupRootPath) . '</a>)';
+        $html .= '<p><a href="' . $escape($config->backupRootPath) . '" class="btn btn-primary btn-lg" '
+            . 'target="_blank" rel="noopener">Zur Backup-Instanz öffnen</a></p>';
     }
-    $html .= '</p>';
 
     if ($lastImport !== null) {
         $html .= '<p>Zuletzt eingespielt: <strong>' . $escape($lastImport['file']) . '</strong> am '
