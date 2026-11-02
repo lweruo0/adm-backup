@@ -9,7 +9,9 @@ use DateTimeImmutable;
  */
 final class BackupRepository
 {
-    private const FILE_PATTERN = '/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql\.gz$/';
+    /** Sicherung mit Zeitstempel (2026-10-25_03-00-00.sql.gz) oder stuendliche Sicherung (last-17-00-00.sql.gz) */
+    private const FILE_PATTERN = '/^(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}|last-\d{2}-00-00)\.sql\.gz$/';
+    private const HOURLY_PREFIX = 'last-';
     private const LAST_IMPORT_FILE = 'last_import.json';
 
     /**
@@ -132,7 +134,14 @@ final class BackupRepository
             return null;
         }
 
-        $createdAt = DateTimeImmutable::createFromFormat('Y-m-d_H-i-s', substr($fileName, 0, 19));
+        if (str_starts_with($fileName, self::HOURLY_PREFIX)) {
+            // stuendliche Sicherung wird taeglich ueberschrieben: Zeitpunkt aus dem Aenderungsdatum der Datei
+            $mtime = filemtime($path);
+            $createdAt = $mtime === false ? false
+                : (new DateTimeImmutable('@' . $mtime))->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+        } else {
+            $createdAt = DateTimeImmutable::createFromFormat('Y-m-d_H-i-s', substr($fileName, 0, 19));
+        }
         if ($createdAt === false) {
             return null;
         }

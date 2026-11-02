@@ -5,7 +5,7 @@ namespace AdmBackup;
 use DateTimeImmutable;
 
 /**
- * Eine vorhandene Backup-Datei (<DB_NAME>/<Zeitstempel>.sql.gz).
+ * Eine vorhandene Backup-Datei (<DB_NAME>/<Zeitstempel>.sql.gz oder stuendlich <DB_NAME>/last-HH-00-00.sql.gz).
  */
 final readonly class BackupFile
 {
@@ -13,7 +13,7 @@ final readonly class BackupFile
      * @param string $fileName Dateiname, z. B. 2026-10-25_03-00-00.sql.gz
      * @param string $path Vollständiger Pfad
      * @param int $size Größe in Bytes
-     * @param DateTimeImmutable $createdAt Zeitpunkt aus dem Dateinamen
+     * @param DateTimeImmutable $createdAt Zeitpunkt aus dem Dateinamen (stuendliche Sicherung: Aenderungsdatum)
      */
     public function __construct(
         public string $fileName,
