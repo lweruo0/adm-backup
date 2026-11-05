@@ -19,7 +19,10 @@ Ablauf:
 2. Das Plugin wird in der Produktiv-Instanz installiert und listet die vorhandenen Backups der
    produktiven Datenbank zur Auswahl auf (Zeitstempel, Größe).
 3. Nach Auswahl einer Datei und Bestätigung wird deren Inhalt in die Datenbank der Backup-Instanz
-   importiert. Der bisherige Inhalt dieser Datenbank wird dabei ersetzt.
+   importiert. Vorher werden alle Admidio-Tabellen (Tabellenpräfix `$g_tbl_praefix`) der
+   Backup-Datenbank gelöscht, damit die Backup-Instanz eine genaue Kopie der Produktion ist (auch
+   Tabellen, die nur auf der Backup-Instanz angelegt wurden, verschwinden). Tabellen mit anderem
+   Präfix bleiben unberührt.
 4. Zusätzlich kann manuell eine Sicherung des aktuellen Zustands der produktiven Datenbank
    erzeugt werden.
 5. Optional: der Schritt „Admidio kopieren“ kopiert alle Dateien der Admidio-Instanz in den Ordner

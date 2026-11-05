@@ -9,7 +9,9 @@ use RuntimeException;
  * Spielt ein Backup (.sql.gz) in die Backup-Datenbank ein und setzt danach die Designfarben der
  * Backup-Instanz, damit sofort erkennbar ist, dass man nicht auf der Produktion arbeitet.
  *
- * Die Dumps enthalten DROP TABLE IF EXISTS, bestehende Tabellen werden dadurch ersetzt.
+ * Vor dem Einspielen werden alle Admidio-Tabellen (Tabellenpräfix) der Backup-Datenbank gelöscht.
+ * So bleiben keine Tabellen übrig, die es in der Produktion nicht gibt (z. B. von Plugins, die nur
+ * auf der Backup-Instanz getestet wurden); die Backup-Instanz ist danach eine genaue Kopie.
  */
 final class BackupImporter
 {
@@ -26,7 +28,13 @@ final class BackupImporter
     {
         $this->config->assertTargetIsNotProduction();
 
-        $this->runMysql($this->config->target, $this->backupFeeder($file), 'Import fehlgeschlagen');
+        // Löschen und Einspielen in einer mysql-Sitzung: bricht der Import ab, meldet mysql den Fehler
+        $dropSql = $this->buildDropTablesSql();
+        $backupFeeder = $this->backupFeeder($file);
+        $this->runMysql($this->config->target, static function ($input) use ($dropSql, $backupFeeder): void {
+            fwrite($input, $dropSql);
+            $backupFeeder($input);
+        }, 'Import fehlgeschlagen');
 
         $this->applyThemeColors();
         $this->repository->writeLastImport($file, new DateTimeImmutable());
@@ -62,6 +70,30 @@ final class BackupImporter
             }
             gzclose($source);
         };
+    }
+
+    /**
+     * SQL, das alle Views und Tabellen mit dem Admidio-Tabellenpräfix in der aktuellen Datenbank löscht.
+     * Die Namen werden in MySQL selbst aus information_schema gelesen (vorbereitete Anweisung), damit
+     * kein zweiter Aufruf von mysql nötig ist. Tabellen anderer Anwendungen mit anderem Präfix bleiben.
+     * Der Präfix ist in BackupConfig validiert ([A-Za-z0-9_]); "_" wird für LIKE maskiert.
+     */
+    public function buildDropTablesSql(): string
+    {
+        $pattern = str_replace('_', '\\_', $this->config->tablePrefix) . '\\_%';
+        $sql = "SET FOREIGN_KEY_CHECKS = 0;\n"
+            . "SET SESSION group_concat_max_len = 1048576;\n";
+        foreach (['VIEW' => 'VIEW', 'TABLE' => 'BASE TABLE'] as $kind => $tableType) {
+            $sql .= "SET @adm_backup_drop = (SELECT IFNULL(CONCAT('DROP " . $kind . " IF EXISTS ', "
+                . "GROUP_CONCAT(CONCAT('`', REPLACE(table_name, '`', '``'), '`'))), 'DO 0') "
+                . "FROM information_schema.tables WHERE table_schema = DATABASE() "
+                . "AND table_type = '" . $tableType . "' AND table_name LIKE '" . $pattern . "');\n"
+                . "PREPARE adm_backup_stmt FROM @adm_backup_drop;\n"
+                . "EXECUTE adm_backup_stmt;\n"
+                . "DEALLOCATE PREPARE adm_backup_stmt;\n";
+        }
+
+        return $sql . "SET FOREIGN_KEY_CHECKS = 1;\n";
     }
 
     /**

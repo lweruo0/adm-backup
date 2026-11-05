@@ -39,6 +39,19 @@ final class BackupImporterTest extends TestCase
         self::assertStringContainsString("SET prf_value = '#808080' WHERE prf_name = 'color_secondary';", $sql);
     }
 
+    public function testDropSqlRemovesOnlyTablesWithPrefixViewsFirst(): void
+    {
+        $config = BackupConfig::fromGlobals($this->globals(['g_tbl_praefix' => 'adm_x']));
+        $sql = (new BackupImporter($config, new BackupRepository('/tmp', 'proddb')))->buildDropTablesSql();
+
+        self::assertStringStartsWith('SET FOREIGN_KEY_CHECKS = 0;', $sql);
+        self::assertStringContainsString("table_name LIKE 'adm\\_x\\_%'", $sql);
+        self::assertStringContainsString("table_schema = DATABASE()", $sql);
+        self::assertLessThan(strpos($sql, "'DROP TABLE IF EXISTS '"), strpos($sql, "'DROP VIEW IF EXISTS '"));
+        self::assertSame(2, substr_count($sql, 'EXECUTE adm_backup_stmt;'));
+        self::assertStringEndsWith("SET FOREIGN_KEY_CHECKS = 1;\n", $sql);
+    }
+
     public function testInvalidColorIsRejected(): void
     {
         $this->expectException(RuntimeException::class);
